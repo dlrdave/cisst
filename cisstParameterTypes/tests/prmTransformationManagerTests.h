@@ -37,8 +37,7 @@ class prmTransformationManagerTest: public CppUnit::TestFixture
 public:
     void setUp(void);
     
-    void tearDown(void) {
-    }
+	void tearDown(void);
     
     /*! Test the Add method */
     void TestAddNode(void);
