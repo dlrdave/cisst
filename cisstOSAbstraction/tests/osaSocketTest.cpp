@@ -25,6 +25,13 @@ http://www.cisst.org/cisst/license.txt.
 
 #include "osaSocketTest.h"
 
+#if (CISST_OS == CISST_WINDOWS)
+#define WIN32_LEAN_AND_MEAN
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#define WINSOCKVERSION MAKEWORD(2,2)
+#endif
+
 
 void osaSocketTest::TestUDP(void)
 {
@@ -55,7 +62,7 @@ void osaSocketTest::TestUDP(void)
 void osaSocketTest::TestTCP(void)
 {
     osaSocketServer server;
-    osaSocket * serverSocket;
+    osaSocket * serverSocket = nullptr;
     osaSocket clientSocket;
 
     bool success;
@@ -79,8 +86,29 @@ void osaSocketTest::TestTCP(void)
     success = clientSocket.Connect("127.0.0.1", 1234);
     CPPUNIT_ASSERT(success);
 
-    serverSocket = server.Accept();
-    CPPUNIT_ASSERT(serverSocket);
+    trials = 10;
+    do {
+        trials--;
+        serverSocket = server.Accept();
+#if (CISST_OS == CISST_WINDOWS)
+        if (serverSocket == nullptr) {
+            int err = WSAGetLastError();
+            if (err == WSAEWOULDBLOCK) {
+                // From https://docs.microsoft.com/en-us/windows/desktop/WinSock/windows-sockets-error-codes-2 :
+                //   "is a nonfatal error, and the operation should be retried later"
+                osaSleep(10.0 * cmn_ms);
+            }
+            else {
+                break;
+            }
+        }
+#endif
+    } while (serverSocket == nullptr && trials);
+
+    if (serverSocket == nullptr) {
+        CPPUNIT_FAIL("could not accept connection");
+        return;
+    }
 
     bytes = clientSocket.Send("testing");
     CPPUNIT_ASSERT_EQUAL(7, bytes);
